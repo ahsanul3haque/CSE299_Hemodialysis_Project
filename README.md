@@ -10,7 +10,7 @@
 ## Week 1: Data Architecture & Clinical Ground Truth
 
 ### The Dataset Architecture
-We are utilizing a peer-reviewed, open-access dataset from Mendeley Data. The repository contains clinical information extracted from 98,015 hemodialysis sessions corresponding to 758 patients. The data tracks 22 clinical parameters (measured 5 times per session), alongside the patient's gender and age. The data is divided into 11 subsets that successively include an increasing number of valid parameters, ranging from 2 up to 24 parameters. Our ingestion pipeline utilizes these CSVs, specifically focusing on the most robust subsets containing fully valid (non-null) clinical measurements.
+We are utilizing a peer-reviewed, open-access dataset from Mendeley Data. The repository contains clinical information extracted from 98,015 hemodialysis sessions corresponding to 758 patients. The data tracks 22 clinical parameters (measured 5 times per session), alongside the patient's gender and age. The data is divided into 11 subsets that successively include an increasing number of valid parameters, ranging from 2 up to 24 parameters. Our custom ingestion pipeline validates the schema of these subsets and confirms a moderate 67:33 class imbalance for our target variable.
 
 ### Clinical Ground Truth Definition
 To establish a medically sound target variable without relying on arbitrary assumptions, we defer to the clinical definition of Intradialytic Hypotension (IDH). The target categorical response column `D_Hipotension` is defined based on standard clinical guidelines, where an adverse event is flagged if the patient experiences:
