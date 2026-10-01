@@ -21,6 +21,6 @@ To establish a medically sound target variable without relying on arbitrary assu
 By utilizing this pre-labeled dataset, our early-warning system is trained on verified, real-world clinical interventions.
 
 ### References & Data Sources
-* **Dataset:** Gomez-Pulido, Juan A. (2022), "Dialysis database: sessions with valid data of clinical parameters", Mendeley Data, V1. 
-  * **Link:** [https://data.mendeley.com/datasets/7kmtsmsgfw/1]
+* **Dataset:** Gomez-Pulido, Juan A. (2021), "Dialysis database: sessions with valid data of clinical parameters", Mendeley Data, V1. 
+  * **Link:** [https://data.mendeley.com/datasets/7kmtsmsgfw/1](https://data.mendeley.com/datasets/7kmtsmsgfw/1)
 * **Clinical Methodology:** Mendoza-Pitti, L., et al. (2022). "Machine-Learning Model to Predict the Intradialytic Hypotension Based on Clinical-Analytical Data."
