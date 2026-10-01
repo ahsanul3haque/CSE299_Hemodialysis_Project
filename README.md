@@ -1,7 +1,10 @@
 # Proactive Risk Assessment and Counterfactual Recommendation for Hemodialysis Patients
-**Course:** CSE299: Junior Design Project 
-**Section:** 11 
-**Faculty Initial:** MUO  
+**Course:** CSE299: Junior Design Project
+
+**Section:** 11
+
+**Faculty Initial:** MUO
+
 **Team Members:** Ahsanul Haque (ID: 2411830642) | Syed Amin Hossain (ID: 2414265042)
 
 ## Week 1: Data Architecture & Clinical Ground Truth
