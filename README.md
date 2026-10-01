@@ -7,6 +7,16 @@
 
 **Team Members:** Ahsanul Haque (ID: 2411830642) | Syed Amin Hossain (ID: 2414265042)
 
+## Project Overview
+Intradialytic Hypotension (IDH) is a severe complication during hemodialysis where a patient's blood pressure drops rapidly, leading to nausea, vomiting, severe muscle cramping, organ ischemia, and loss of consciousness. Currently, clinical responses to IDH are reactive - nurses intervene only after the alarms trigger and the patient is already crashing. 
+
+This project aims to transition hemodialysis care from reactive to proactive. By engineering a machine learning pipeline trained on 98,015 historical hemodialysis sessions, we are building an early-warning AI designed to predict an IDH event before clinical symptoms occur, allowing nurses to adjust machine settings and prevent patient suffering.
+
+## Core Objectives
+* **Proactive Prediction:** Identify hidden physiological patterns that precede a severe blood pressure crash.
+* **Clinical Validity:** Utilize a rigorously defined, multi-factor medical threshold (incorporating SBP drops, MAP decreases, and absolute nadir limits) rather than arbitrary statistical proxies.
+* **Robust Data Engineering:** Successfully preprocess and balance a heavily skewed (67:33) real-world Spanish medical dataset.
+
 ## Week 1: Data Architecture & Clinical Ground Truth
 
 ### The Dataset Architecture
