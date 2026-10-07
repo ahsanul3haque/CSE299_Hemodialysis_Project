@@ -1,4 +1,5 @@
 import pandas as pd
+pd.set_option('display.max_columns', None)
 import os
 
 
@@ -11,7 +12,44 @@ def load_and_validate_data(file_name):
     # 1. Load the raw data
     try:
         # Mendeley datasets often use semicolons
-        df = pd.read_csv(file_path, sep=';')
+        df = pd.read_csv(file_path, sep=';', index_col=False)
+
+        column_translations = {
+            'D_Hipotension': 'Hypotension',
+            'D_Sexo': 'Sex',
+            'D_Edad': 'Age',
+            'D_Dializador': 'Dialyzer',
+            'D_Bano': 'Dialysate_Bath',
+            'D_Tecnica': 'Technique',
+            'D_PesoSeco': 'Dry_Weight',
+            'D_PesoPre': 'Pre_Weight',
+            'D_PesoPost': 'Post_Weight',
+            'D_Ganancia': 'Weight_Gain',
+            'D_TemperaturaBano': 'Dialysate_Temperature',
+            'D_VolumenReposicion': 'Replacement_Volume',
+            'D_Kt': 'Kt',
+            'D_FlujoSangre': 'Blood_Flow',
+            'D_FlujoBano': 'Dialysate_Flow',
+            'D_ConductividadBano': 'Dialysate_Conductivity',
+            'D_ConductividadBicarbonato': 'Bicarbonate_Conductivity',
+            'D_PresionArterial': 'Arterial_Pressure',
+            'D_PresionVenosa': 'Venous_Pressure',
+            'D_PTM': 'Transmembrane_Pressure', 
+            'D_TAS': 'Systolic_BP', 
+            'D_TAD': 'Diastolic_BP', 
+            'D_Pulso': 'Pulse',
+            'D_UF': 'Ultrafiltration',
+            'D_Temperatura': 'Patient_Temperature'
+        }
+
+        df=df.rename(columns=column_translations)
+
+
+        df["Age"]=df["Age"].astype('int8')
+        df["Sex"]=df["Sex"].astype('int8')
+
+
+        print("\n")
     except FileNotFoundError:
         print(
             f"Error: {file_path} not found. Ensure it is in the data/ folder.")
@@ -23,7 +61,7 @@ def load_and_validate_data(file_name):
 
     # 3. Identify the Target Variable (Hypotension label)
     target_cols = [
-        col for col in df.columns if 'hipotension' in col.lower() or 'idh' in col.lower()]
+        col for col in df.columns if 'hypotension' in col.lower() or 'idh' in col.lower()]
     if target_cols:
         target = target_cols[0]
         print(f"\nTarget Variable Found: '{target}'")
@@ -49,6 +87,6 @@ if __name__ == "__main__":
     ]
 
     # 2. Loop through the list and process each file one by one
-    for current_file in dataset_files:
-        load_and_validate_data(current_file)
-        print("\n" + "="*50 + "\n")  # Prints a visual divider between datasets
+    target_file="dataset_10.csv"
+    load_and_validate_data(target_file)
+    print("\n" + "="*50 + "\n")  # Prints a visual divider between datasets
