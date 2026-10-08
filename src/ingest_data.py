@@ -161,6 +161,14 @@ def cap_outliers(df):
 
     return df
 
+def scale_features(df):
+    numeric_cols=df.select_dtypes(include=['number']).columns.drop(['Hypotension', 'Sex'], errors='ignore')
+
+    scaler=MinMaxScaler()
+
+    df[numeric_cols]=scaler.fit_transform(df[numeric_cols])
+
+    return df
 
     
 if __name__ == "__main__":
