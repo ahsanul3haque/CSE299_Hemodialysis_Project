@@ -140,8 +140,26 @@ def hypotension_binarization(df):
     df["Hypotension"]=df["Hypotension"].map({'no': 0, 'si': 1, 'yes':1})
     return df
 
+def handle_missing_values(df):
+    numeric_cols=df.select_dtypes(include=['number']).columns
+    
+    for col in numeric_cols:
+        df[col]=df[col].fillna(df[col].median())
 
+    return df
 
+def cap_outliers(df):
+    numeric_cols=df.select_dtypes(include=['number']).columns
+
+    if 'Hypotension' in numeric_cols:
+        numeric_cols=numeric_cols.drop('Hypotension')
+
+    lower_bound=df[numeric_cols].quantile(0.01)
+    upper_bound=df[numeric_cols].quantile(0.99)
+
+    df[numeric_cols]=df[numeric_cols].clip(lower=lower_bound, upper=upper_bound, axis=1)
+
+    return df
 
 
     
