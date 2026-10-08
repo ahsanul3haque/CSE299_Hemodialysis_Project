@@ -76,6 +76,23 @@ def load_and_validate_data(file_name):
     print("\nMissing Values per Feature:")
     print(missing_data[missing_data > 0])
 
+def load_and_align_data(file_name):
+    file_path = os.path.join("data", file_name)
+    print(f"--- Ingesting {file_name} ---")
+    
+        # 1. Load the raw data
+    try:
+        # Mendeley datasets often use semicolons
+        df = pd.read_csv(file_path, sep=';', index_col=False)
+        return df
+    
+            
+        print("\n")
+    except FileNotFoundError:
+            print(
+                f"Error: {file_path} not found. Ensure it is in the data/ folder.")
+            return
+
 
 if __name__ == "__main__":
     # 1. Create a list of all downloaded dataset filenames
