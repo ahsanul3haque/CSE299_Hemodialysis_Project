@@ -93,6 +93,38 @@ def load_and_align_data(file_name):
                 f"Error: {file_path} not found. Ensure it is in the data/ folder.")
             return
 
+def translate_columns(df):
+
+    column_translations = {
+        'D_Hipotension': 'Hypotension',
+        'D_Sexo': 'Sex',
+        'D_Edad': 'Age',
+        'D_Dializador': 'Dialyzer',
+        'D_Bano': 'Dialysate_Bath',
+        'D_Tecnica': 'Technique',
+        'D_PesoSeco': 'Dry_Weight',
+        'D_PesoPre': 'Pre_Weight',
+        'D_PesoPost': 'Post_Weight',
+        'D_Ganancia': 'Weight_Gain',
+        'D_TemperaturaBano': 'Dialysate_Temperature',
+        'D_VolumenReposicion': 'Replacement_Volume',
+        'D_Kt': 'Kt',
+        'D_FlujoSangre': 'Blood_Flow',
+        'D_FlujoBano': 'Dialysate_Flow',
+        'D_ConductividadBano': 'Dialysate_Conductivity',
+        'D_ConductividadBicarbonato': 'Bicarbonate_Conductivity',
+        'D_PresionArterial': 'Arterial_Pressure',
+        'D_PresionVenosa': 'Venous_Pressure',
+        'D_PTM': 'Transmembrane_Pressure', 
+        'D_TAS': 'Systolic_BP', 
+        'D_TAD': 'Diastolic_BP', 
+        'D_Pulso': 'Pulse',
+        'D_UF': 'Ultrafiltration',
+        'D_Temperatura': 'Patient_Temperature'
+    }
+
+    df=df.rename(columns=column_translations)
+    return df
 
 if __name__ == "__main__":
     # 1. Create a list of all downloaded dataset filenames
