@@ -131,6 +131,9 @@ def optimize_memory(df):
     df["Age"]=df["Age"].astype('int8')
 
     return df
+def remove_leakable_features(df):
+    df=df.drop(['Post_Weight', 'Kt', 'Replacement_Volume', 'Ultrafiltration'], axis=1, errors='Ignore')
+    return df
 if __name__ == "__main__":
     # 1. Create a list of all downloaded dataset filenames
     dataset_files = [
