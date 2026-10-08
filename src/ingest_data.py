@@ -1,4 +1,6 @@
 import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+pd.set_option('display.max_columns', None)
 import os
 
 
@@ -11,7 +13,7 @@ def load_and_validate_data(file_name):
     # 1. Load the raw data
     try:
         # Mendeley datasets often use semicolons
-        df = pd.read_csv(file_path, sep=';')
+        df = pd.read_csv(file_path, sep=';', index_col=False)
     except FileNotFoundError:
         print(
             f"Error: {file_path} not found. Ensure it is in the data/ folder.")
@@ -23,7 +25,7 @@ def load_and_validate_data(file_name):
 
     # 3. Identify the Target Variable (Hypotension label)
     target_cols = [
-        col for col in df.columns if 'hipotension' in col.lower() or 'idh' in col.lower()]
+        col for col in df.columns if 'hypotension' in col.lower() or 'idh' in col.lower()]
     if target_cols:
         target = target_cols[0]
         print(f"\nTarget Variable Found: '{target}'")
@@ -38,6 +40,108 @@ def load_and_validate_data(file_name):
     print("\nMissing Values per Feature:")
     print(missing_data[missing_data > 0])
 
+def load_and_align_data(file_name):
+    file_path = os.path.join("data", file_name)
+    print(f"--- Ingesting {file_name} ---")
+    
+        # 1. Load the raw data
+    try:
+        # Mendeley datasets often use semicolons
+        df = pd.read_csv(file_path, sep=';', index_col=False)
+        return df
+    
+    except FileNotFoundError:
+            print(
+                f"Error: {file_path} not found. Ensure it is in the data/ folder.")
+            return
+
+def translate_columns(df):
+
+    column_translations = {
+        'D_Hipotension': 'Hypotension',
+        'D_Sexo': 'Sex',
+        'D_Edad': 'Age',
+        'D_Dializador': 'Dialyzer',
+        'D_Bano': 'Dialysate_Bath',
+        'D_Tecnica': 'Technique',
+        'D_PesoSeco': 'Dry_Weight',
+        'D_PesoPre': 'Pre_Weight',
+        'D_PesoPost': 'Post_Weight',
+        'D_Ganancia': 'Weight_Gain',
+        'D_TemperaturaBano': 'Dialysate_Temperature',
+        'D_VolumenReposicion': 'Replacement_Volume',
+        'D_Kt': 'Kt',
+        'D_FlujoSangre': 'Blood_Flow',
+        'D_FlujoBano': 'Dialysate_Flow',
+        'D_ConductividadBano': 'Dialysate_Conductivity',
+        'D_ConductividadBicarbonato': 'Bicarbonate_Conductivity',
+        'D_PresionArterial': 'Arterial_Pressure',
+        'D_PresionVenosa': 'Venous_Pressure',
+        'D_PTM': 'Transmembrane_Pressure', 
+        'D_TAS': 'Systolic_BP', 
+        'D_TAD': 'Diastolic_BP', 
+        'D_Pulso': 'Pulse',
+        'D_UF': 'Ultrafiltration',
+        'D_Temperatura': 'Patient_Temperature'
+    }
+
+    df=df.rename(columns=column_translations)
+    return df
+
+def optimize_memory(df):
+    df["Sex"]=df["Sex"].astype('int8')
+    df["Age"]=df["Age"].astype('int8')
+
+    return df
+
+def remove_leakable_features(df):
+    df=df.drop(['Post_Weight', 'Kt', 'Replacement_Volume', 'Ultrafiltration'], axis=1, errors='ignore')
+    return df
+
+def hypotension_binarization(df):
+    df["Hypotension"]=df["Hypotension"].str.lower()
+    df["Hypotension"]=df["Hypotension"].map({'no': 0, 'si': 1, 'yes':1})
+    return df
+
+def handle_missing_values(df):
+    numeric_cols=df.select_dtypes(include=['number']).columns
+    
+    for col in numeric_cols:
+        df[col]=df[col].fillna(df[col].median())
+
+    return df
+
+def cap_outliers(df):
+    numeric_cols=df.select_dtypes(include=['number']).columns
+
+    if 'Hypotension' in numeric_cols:
+        numeric_cols=numeric_cols.drop('Hypotension')
+
+    lower_bound=df[numeric_cols].quantile(0.01)
+    upper_bound=df[numeric_cols].quantile(0.99)
+
+    df[numeric_cols]=df[numeric_cols].clip(lower=lower_bound, upper=upper_bound, axis=1)
+
+    return df
+
+def scale_features(df):
+    numeric_cols=df.select_dtypes(include=['number']).columns.drop(['Hypotension', 'Sex'], errors='ignore')
+
+    scaler=MinMaxScaler()
+
+    df[numeric_cols]=scaler.fit_transform(df[numeric_cols])
+
+    return df
+    
+
+
+
+
+
+    
+                               
+
+
 
 if __name__ == "__main__":
     # 1. Create a list of all downloaded dataset filenames
@@ -49,6 +153,25 @@ if __name__ == "__main__":
     ]
 
     # 2. Loop through the list and process each file one by one
-    for current_file in dataset_files:
-        load_and_validate_data(current_file)
-        print("\n" + "="*50 + "\n")  # Prints a visual divider between datasets
+    
+    #load_and_validate_data(dataset_files)
+    ##print("\n" + "="*50 + "\n")  # Prints a visual divider between datasets
+    
+    target_file="dataset_10.csv"
+    loaded_only_dataset=load_and_align_data(target_file)
+    translated_dataset=translate_columns(loaded_only_dataset)
+    optimized_dataset=optimize_memory(translated_dataset)
+    leakproof_dataset=remove_leakable_features(optimized_dataset)
+    hypotension_binarized_dataset=hypotension_binarization(leakproof_dataset)
+    scaled_features_dataset=scale_features(hypotension_binarized_dataset)
+
+    scaled_features_dataset.to_csv("data/processed_dataset_10.csv", index=False)
+    print("Pipeline complete! Exported processed_dataset_10.csv to the data/ folder.")
+
+    
+
+    
+    
+    
+
+
