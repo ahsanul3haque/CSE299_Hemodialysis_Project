@@ -126,6 +126,11 @@ def translate_columns(df):
     df=df.rename(columns=column_translations)
     return df
 
+def optimize_memory(df):
+    df["Sex"]=df["Sex"].astype('int8')
+    df["Age"]=df["Age"].astype('int8')
+
+    return df
 if __name__ == "__main__":
     # 1. Create a list of all downloaded dataset filenames
     dataset_files = [
