@@ -132,8 +132,19 @@ def optimize_memory(df):
 
     return df
 def remove_leakable_features(df):
-    df=df.drop(['Post_Weight', 'Kt', 'Replacement_Volume', 'Ultrafiltration'], axis=1, errors='Ignore')
+    df=df.drop(['Post_Weight', 'Kt', 'Replacement_Volume', 'Ultrafiltration'], axis=1, errors='ignore')
     return df
+
+def hypotension_binarization(df):
+    df["Hypotension"]=df["Hypotension"].str.lower()
+    df["Hypotension"]=df["Hypotension"].map({'no': 0, 'si': 1, 'yes':1})
+    return df
+
+
+
+
+
+    
 if __name__ == "__main__":
     # 1. Create a list of all downloaded dataset filenames
     dataset_files = [
