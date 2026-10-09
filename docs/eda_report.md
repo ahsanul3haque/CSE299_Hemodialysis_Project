@@ -2,11 +2,11 @@
 
 **Dataset:** `dataset_10.csv` (Processed output: `data/processed_dataset_10.csv`)  
 **Author:** Ahsanul Haque  
-**File:** `Ahsanul_Week2_EDA`  
+**File:** `exploratory_data_analysis.ipynb`  
 
 ---
 
-## 1. Notebook Cell Overview (`Ahsanul_Week2_EDA.ipynb`)
+## 1. Notebook Cell Overview (`exploratory_data_analysis.ipynb`)
 
 | Cell | Title | Purpose / Methods |
 | :--- | :--- | :--- |
