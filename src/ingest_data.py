@@ -1,7 +1,8 @@
+import os
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+
 pd.set_option('display.max_columns', None)
-import os
 
 
 def load_and_validate_data(file_name):
@@ -25,7 +26,8 @@ def load_and_validate_data(file_name):
 
     # 3. Identify the Target Variable (Hypotension label)
     target_cols = [
-        col for col in df.columns if 'hypotension' in col.lower() or 'idh' in col.lower()]
+        col for col in df.columns if 'hypotension' in col.lower() or 'idh' in col.lower()
+    ]
     if target_cols:
         target = target_cols[0]
         print(f"\nTarget Variable Found: '{target}'")
@@ -40,23 +42,21 @@ def load_and_validate_data(file_name):
     print("\nMissing Values per Feature:")
     print(missing_data[missing_data > 0])
 
+
 def load_and_align_data(file_name):
     file_path = os.path.join("data", file_name)
     print(f"--- Ingesting {file_name} ---")
-    
-        # 1. Load the raw data
+
     try:
-        # Mendeley datasets often use semicolons
         df = pd.read_csv(file_path, sep=';', index_col=False)
         return df
-    
     except FileNotFoundError:
-            print(
-                f"Error: {file_path} not found. Ensure it is in the data/ folder.")
-            return
+        print(
+            f"Error: {file_path} not found. Ensure it is in the data/ folder.")
+        return
+
 
 def translate_columns(df):
-
     column_translations = {
         'D_Hipotension': 'Hypotension',
         'D_Sexo': 'Sex',
@@ -77,20 +77,23 @@ def translate_columns(df):
         'D_ConductividadBicarbonato': 'Bicarbonate_Conductivity',
         'D_PresionArterial': 'Arterial_Pressure',
         'D_PresionVenosa': 'Venous_Pressure',
-        'D_PTM': 'Transmembrane_Pressure', 
-        'D_TAS': 'Systolic_BP', 
-        'D_TAD': 'Diastolic_BP', 
+        'D_PTM': 'Transmembrane_Pressure',
+        'D_TAS': 'Systolic_BP',
+        'D_TAD': 'Diastolic_BP',
         'D_Pulso': 'Pulse',
         'D_UF': 'Ultrafiltration',
         'D_Temperatura': 'Patient_Temperature'
     }
 
-    df=df.rename(columns=column_translations)
+    df = df.rename(columns=column_translations)
     return df
 
+
 def optimize_memory(df):
-    df["Sex"]=df["Sex"].astype('int8')
-    df["Age"]=df["Age"].astype('int8')
+    if 'Sex' in df.columns:
+        df["Sex"] = df["Sex"].fillna(0).astype('int8')
+    if 'Age' in df.columns:
+        df["Age"] = df["Age"].fillna(0).astype('int8')
 
     return df
 
@@ -109,9 +112,13 @@ def hypotension_binarization(df):
     # Convert string values to uppercase and strip whitespace
     clean_series = df["Hypotension"].astype(str).str.strip().str.upper()
 
-    # Map Spanish string labels to binary classification targets
-    # NO -> 0 (Stable), SI/YES -> 1 (IDH Crash)
-    df["Hypotension"] = clean_series.map({'NO': 0, 'SI': 1, 'YES': 1})
+    # Map raw numeric codes (1/2) and string labels (NO/SI) to binary classification targets
+    # 1 / NO -> 0 (Stable), 2 / SI / YES -> 1 (IDH Crash)
+    target_map = {
+        '1': 0, '1.0': 0, 'NO': 0,
+        '2': 1, '2.0': 1, 'SI': 1, 'YES': 1
+    }
+    df["Hypotension"] = clean_series.map(target_map)
 
     print("\n--- Target Variable Binarization Summary ---")
     print("Null count remaining:", df["Hypotension"].isnull().sum())
@@ -121,65 +128,54 @@ def hypotension_binarization(df):
 
     return df
 
+
 def handle_missing_values(df):
-    numeric_cols=df.select_dtypes(include=['number']).columns
-    
+    numeric_cols = df.select_dtypes(include=['number']).columns.drop(
+        'Hypotension', errors='ignore')
+
     for col in numeric_cols:
-        df[col]=df[col].fillna(df[col].median())
+        df[col] = df[col].fillna(df[col].median())
 
     return df
+
 
 def cap_outliers(df):
-    numeric_cols=df.select_dtypes(include=['number']).columns
+    numeric_cols = df.select_dtypes(include=['number']).columns
 
     if 'Hypotension' in numeric_cols:
-        numeric_cols=numeric_cols.drop('Hypotension')
+        numeric_cols = numeric_cols.drop('Hypotension')
 
-    lower_bound=df[numeric_cols].quantile(0.01)
-    upper_bound=df[numeric_cols].quantile(0.99)
+    lower_bound = df[numeric_cols].quantile(0.01)
+    upper_bound = df[numeric_cols].quantile(0.99)
 
-    df[numeric_cols]=df[numeric_cols].clip(lower=lower_bound, upper=upper_bound, axis=1)
+    df[numeric_cols] = df[numeric_cols].clip(
+        lower=lower_bound, upper=upper_bound, axis=1)
 
     return df
+
 
 def scale_features(df):
-    numeric_cols=df.select_dtypes(include=['number']).columns.drop(['Hypotension', 'Sex'], errors='ignore')
+    numeric_cols = df.select_dtypes(include=['number']).columns.drop(
+        ['Hypotension', 'Sex'], errors='ignore')
 
-    scaler=MinMaxScaler()
-
-    df[numeric_cols]=scaler.fit_transform(df[numeric_cols])
+    scaler = MinMaxScaler()
+    df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
 
     return df
-    
+
 
 if __name__ == "__main__":
-    # 1. Create a list of all downloaded dataset filenames
-    dataset_files = [
-        "dataset_1.csv", "dataset_2.csv", "dataset_3.csv",
-        "dataset_4.csv", "dataset_5.csv", "dataset_6.csv",
-        "dataset_7.csv", "dataset_8.csv", "dataset_9.csv",
-        "dataset_10.csv", "dataset_11.csv"
-    ]
-
-    # 2. Loop through the list and process each file one by one
-    
-    #load_and_validate_data(dataset_files)
-    ##print("\n" + "="*50 + "\n")  # Prints a visual divider between datasets
-    
     target_file = "dataset_10.csv"
+
     loaded_only_dataset = load_and_align_data(target_file)
     translated_dataset = translate_columns(loaded_only_dataset)
-    optimized_dataset = optimize_memory(translated_dataset)
+    binarized_dataset = hypotension_binarization(translated_dataset)
+    optimized_dataset = optimize_memory(binarized_dataset)
     leakproof_dataset = remove_leakable_features(optimized_dataset)
     imputed_dataset = handle_missing_values(leakproof_dataset)
     capped_dataset = cap_outliers(imputed_dataset)
+    scaled_features_dataset = scale_features(capped_dataset)
 
-    hypotension_binarized_dataset = hypotension_binarization(capped_dataset)
-    scaled_features_dataset = scale_features(hypotension_binarized_dataset)
-
-    scaled_features_dataset.to_csv("data/processed_dataset_10.csv", index=False)
+    scaled_features_dataset.to_csv(
+        "data/processed_dataset_10.csv", index=False)
     print("Pipeline complete! Exported processed_dataset_10.csv to the data/ folder.")
-
-    
-
-
