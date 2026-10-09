@@ -94,13 +94,31 @@ def optimize_memory(df):
 
     return df
 
+
 def remove_leakable_features(df):
-    df=df.drop(['Post_Weight', 'Kt', 'Replacement_Volume', 'Ultrafiltration'], axis=1, errors='ignore')
+    # Drop post-treatment leakable features AND zero-variance constant features
+    cols_to_drop = [
+        'Post_Weight', 'Kt', 'Replacement_Volume', 'Ultrafiltration',  # Leakable
+        'Technique', 'Bicarbonate_Conductivity'                       # Zero variance
+    ]
+    df = df.drop(columns=cols_to_drop, errors='ignore')
     return df
 
+
 def hypotension_binarization(df):
-    df["Hypotension"]=df["Hypotension"].str.lower()
-    df["Hypotension"]=df["Hypotension"].map({'no': 0, 'si': 1, 'yes':1})
+    # Convert string values to uppercase and strip whitespace
+    clean_series = df["Hypotension"].astype(str).str.strip().str.upper()
+
+    # Map Spanish string labels to binary classification targets
+    # NO -> 0 (Stable), SI/YES -> 1 (IDH Crash)
+    df["Hypotension"] = clean_series.map({'NO': 0, 'SI': 1, 'YES': 1})
+
+    print("\n--- Target Variable Binarization Summary ---")
+    print("Null count remaining:", df["Hypotension"].isnull().sum())
+    print("Class Distribution (%):")
+    print(df["Hypotension"].value_counts(normalize=True) * 100)
+    print("--------------------------------------------\n")
+
     return df
 
 def handle_missing_values(df):
@@ -134,15 +152,6 @@ def scale_features(df):
     return df
     
 
-
-
-
-
-    
-                               
-
-
-
 if __name__ == "__main__":
     # 1. Create a list of all downloaded dataset filenames
     dataset_files = [
@@ -157,21 +166,20 @@ if __name__ == "__main__":
     #load_and_validate_data(dataset_files)
     ##print("\n" + "="*50 + "\n")  # Prints a visual divider between datasets
     
-    target_file="dataset_10.csv"
-    loaded_only_dataset=load_and_align_data(target_file)
-    translated_dataset=translate_columns(loaded_only_dataset)
-    optimized_dataset=optimize_memory(translated_dataset)
-    leakproof_dataset=remove_leakable_features(optimized_dataset)
-    hypotension_binarized_dataset=hypotension_binarization(leakproof_dataset)
-    scaled_features_dataset=scale_features(hypotension_binarized_dataset)
+    target_file = "dataset_10.csv"
+    loaded_only_dataset = load_and_align_data(target_file)
+    translated_dataset = translate_columns(loaded_only_dataset)
+    optimized_dataset = optimize_memory(translated_dataset)
+    leakproof_dataset = remove_leakable_features(optimized_dataset)
+    imputed_dataset = handle_missing_values(leakproof_dataset)
+    capped_dataset = cap_outliers(imputed_dataset)
+
+    hypotension_binarized_dataset = hypotension_binarization(capped_dataset)
+    scaled_features_dataset = scale_features(hypotension_binarized_dataset)
 
     scaled_features_dataset.to_csv("data/processed_dataset_10.csv", index=False)
     print("Pipeline complete! Exported processed_dataset_10.csv to the data/ folder.")
 
-    
-
-    
-    
     
 
 
