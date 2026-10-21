@@ -62,14 +62,18 @@ To rigorously test model behavior under severe class imbalance, we implemented a
 ### Summary Benchmark Leaderboard (5-Fold CV Mean)
 | Model | Strategy | Accuracy | Precision | Recall (Sensitivity) | F1-Score | ROC-AUC | PR-AUC |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Random Forest** | Class-Weighted | 0.8148 | 0.5585 | 0.4398 | 0.4915 | 0.7905 | 0.5320 |
-| **XGBoost** | Class-Weighted | 0.7882 | 0.4818 | 0.5067 | 0.4938 | 0.7676 | 0.5123 |
-| **Logistic Regression** | Class-Weighted | 0.6848 | 0.3530 | 0.6552 | 0.4588 | 0.7332 | 0.4517 |
-| **Gaussian Naive Bayes** | Class-Weighted | 0.6715 | 0.3368 | 0.6307 | 0.4391 | 0.7119 | 0.4256 |
-| **Decision Tree** | Class-Weighted | 0.7484 | 0.3855 | 0.3930 | 0.3892 | 0.7275 | 0.2753 |
-| **Dummy Classifier** | Unadjusted | 0.7961 | 0.0000 | 0.0000 | 0.0000 | 0.5000 | 0.2039 |
-
----
+| **Random Forest** | **SMOTE** | 0.8096 | 0.5389 | 0.4595 | **0.4957** | **0.7915** | 0.5267 |
+| **XGBoost** | **Class-Weighted** | 0.7882 | 0.4818 | **0.5067** | 0.4938 | 0.7676 | 0.5123 |
+| **Random Forest** | **Class-Weighted** | 0.8148 | 0.5585 | 0.4398 | 0.4915 | 0.7905 | 0.5320 |
+| **XGBoost** | **SMOTE** | 0.8169 | 0.5765 | 0.3851 | 0.4612 | 0.7695 | 0.5154 |
+| **Logistic Regression** | **Class-Weighted** | 0.6848 | 0.3530 | **0.6552** | 0.4588 | 0.7344 | 0.4527 |
+| **Logistic Regression** | **SMOTE** | 0.6826 | 0.3516 | **0.6595** | 0.4587 | 0.7341 | 0.4517 |
+| **Gaussian Naive Bayes** | **Class-Weighted** | 0.6715 | 0.3368 | 0.6307 | 0.4391 | 0.7119 | 0.4256 |
+| **XGBoost** | **Unadjusted** | 0.8163 | 0.5871 | 0.3413 | 0.4300 | 0.7719 | 0.5151 |
+| **Decision Tree** | **SMOTE** | 0.7188 | 0.3549 | 0.4628 | 0.4015 | 0.6236 | 0.2739 |
+| **Decision Tree** | **Class-Weighted** | 0.7484 | 0.3855 | 0.3930 | 0.3892 | 0.6162 | 0.2753 |
+| **Random Forest** | **Unadjusted** | **0.8252** | **0.6805** | 0.2690 | 0.3850 | 0.7883 | **0.5360** |
+| **Dummy Classifier** | **Unadjusted** | 0.7961 | 0.0000 | 0.0000 | 0.0000 | 0.5000 | 0.2039 |
 
 ## 4. Phase 3: Notebook Visual Artifacts & Cell-by-Cell Breakdown (`notebooks/baseline_modeling.ipynb`)
 
