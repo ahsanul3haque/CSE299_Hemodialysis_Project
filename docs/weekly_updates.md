@@ -1,7 +1,7 @@
 # CSE299 Weekly Updates
 
 ## Week 1
-**Date:** October 4, 2026
+**Date:** October 5, 2026
 
 **Status:** Complete
 
@@ -13,7 +13,7 @@ On the engineering side, we initialized our GitHub repository, configured our da
 ---
 
 ## Week 2
-**Date:** October 11, 2026
+**Date:** October 12, 2026
 
 **Status:** Complete
 
@@ -33,7 +33,7 @@ Finally, all findings were documented in `docs/eda_report.md`, establishing a cl
 ---
 
 ## Week 3
-**Date:** October 18, 2026
+**Date:** October 26, 2026
 
 **Status:** Complete
 
