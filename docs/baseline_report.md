@@ -24,22 +24,27 @@ To provide machine learning models with advanced physiological context beyond ra
 
 1. **Pulse Pressure ($PP$):**
    $$PP = \text{Systolic} - \text{Diastolic}$$
+   
    *Clinical Rationale:* Measures arterial stiffness and vascular compliance. Narrow pulse pressure combined with rapid fluid removal often precedes circulatory collapse.
 
 2. **Mean Arterial Pressure ($MAP$):**
    $$MAP = \text{Diastolic} + \frac{1}{3}(\text{Systolic} - \text{Diastolic})$$
+   
    *Clinical Rationale:* Provides a robust summary metric of true organ perfusion pressure across the cardiac cycle.
 
 3. **Shock Index ($SI$):**
    $$SI = \frac{\text{Pulse}}{\text{Systolic}}$$
+   
    *Clinical Rationale:* A well-established emergency triage metric. An rising heart rate relative to dropping systolic blood pressure signals early compensatory shock.
 
 4. **Relative Weight Gain ($RWG$):**
    $$RWG = \frac{\text{PreWeight} - \text{DryWeight}}{\text{DryWeight}}$$
+   
    *Clinical Rationale:* Normalizes interdialytic fluid accumulation relative to patient baseline dry weight, accounting for patient body size differences.
 
-5. **UF Strain Proxy ($UFR$):**
+5. **Ultrafiltration Strain Proxy ($UFR$):**
    $$UFR = \frac{\text{WeightGain}}{\text{BloodFlow} + 10^{-5}}$$
+   
    *Clinical Rationale:* Ratios total fluid removal requirements against extracorporeal blood flow rates to gauge vascular refilling stress.
 
 ---
