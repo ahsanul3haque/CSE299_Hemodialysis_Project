@@ -56,7 +56,7 @@ print("TOP FEATURES: LOGISTIC REGRESSION")
 lr_importance = pd.DataFrame({
     'Feature': X.columns,
     'Coefficient': models["Logistic Regression"].coef_[0]
-}).sort_values(by='Coefficient', ascending=False)
+}).sort_values(by='Coefficient', key=abs, ascending=False)
 print(lr_importance.head(5))
 
 print("\nTOP FEATURES: RANDOM FOREST")
@@ -66,4 +66,9 @@ rf_importance = pd.DataFrame({
 }).sort_values(by='Importance', ascending=False)
 print(rf_importance.head(5))
 
-
+print("\nTOP FEATURES: GRADIENT BOOSTING")
+gb_importance = pd.DataFrame({
+    'Feature': X.columns,
+    'Importance': models["Gradient Boosting"].feature_importances_
+}).sort_values(by='Importance', ascending=False)
+print(gb_importance.head(5))
