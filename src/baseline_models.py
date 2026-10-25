@@ -4,6 +4,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 
+from evaluation_module import plot_pr_auc_curves, plot_custom_threshold_cm
+
 
 df = pd.read_csv("data/processed_dataset_10.csv")
 
@@ -51,6 +53,7 @@ for name, model in models.items():
     print(f"ROC-AUC Score: {roc_auc_score(y_test, y_proba):.4f}\n")
 
 
+
 print("="*40)
 print("TOP FEATURES: LOGISTIC REGRESSION")
 lr_importance = pd.DataFrame({
@@ -72,3 +75,7 @@ gb_importance = pd.DataFrame({
     'Importance': models["Gradient Boosting"].feature_importances_
 }).sort_values(by='Importance', ascending=False)
 print(gb_importance.head(5))
+
+plot_pr_auc_curves(models, X_test, y_test)
+plot_custom_threshold_cm(models["Logistic Regression"], "Logistic Regression", X_test, y_test, threshold=0.3)
+plot_custom_threshold_cm(models["Logistic Regression"], "Logistic Regression", X_test, y_test, threshold=0.7)
