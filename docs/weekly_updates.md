@@ -51,3 +51,29 @@ On the analytical side, we constructed `notebooks/baseline_modeling.ipynb` acros
 4. **Confusion Matrices & Feature Importances:** Compared exact patient classification counts across our top 3 ensemble models (`265` crashes caught by Weighted RF, `276` by SMOTE RF, and `302` by Weighted XGBoost) and verified that engineered hemodynamic ratios directly drive ensemble split decisions.
 
 All methodology, equations, and full 18-experiment tables were documented in `docs/baseline_report.md`, setting up our top tree ensembles for hyperparameter tuning and SHAP explainability in Week 4.
+
+---
+
+---
+
+## Week 4
+**Date:** November 2, 2026
+
+**Status:** Complete
+
+**Update Summary:**
+In Week 4, our primary objective was transitioning our pipeline from untuned baseline benchmarking to systematically optimized, clinically calibrated production models and selecting our single Champion Architecture for downstream Explainable AI (XAI) and Counterfactual deployment.
+
+First, fulfilling our CSE299 project proposal roadmap, we expanded our gradient boosting framework by integrating **LightGBM (`LGBMClassifier`)** alongside our top Week 3 contenders: **Random Forest (Class-Weighted)**, **Random Forest (SMOTE)**, and **XGBoost (Class-Weighted)**. This allowed us to benchmark leaf-wise histogram decision tree splitting against depth-wise gradient boosting and bootstrap aggregation.
+
+Second, we engineered `src/tune_models.py` to execute **5-Fold Stratified `RandomizedSearchCV` (`15 candidate iterations × 5 folds = 75 fits per model`, totaling 300 cross-validation fits)** optimizing specifically for F1-Score on the 80% training split (10,909 sessions). To guarantee zero validation data leakage during hyperparameter tuning, `Random Forest (SMOTE)` was wrapped inside an `imblearn.pipeline.Pipeline` so synthetic minority oversampling occurred strictly inside the 4 training folds of every split. Hyperparameter optimization produced major structural improvements across all architectures:
+- **Random Forest Regularization:** Capping previously unconstrained tree depth (`max_depth=16` for Weighted, `15` for SMOTE) and enforcing minimum leaf populations (`min_samples_leaf=4` and `2`) eliminated majority-class overfitting, surging default-threshold holdout Recall from `48.74%` to `60.61%` (+11.87%) and pushing ROC-AUC to a project-high `0.8158`.
+- **Gradient Boosting Shrinkage & Subsampling:** Reducing `learning_rate` from default `0.30` down to `0.03` and restricting feature subsampling (`colsample_bytree=0.8`) prevented `Systolic_BP` from monopolizing early splits, elevating **XGBoost PR-AUC from `0.5369` to `0.5981` (+6.12%)** and propelling **Tuned LightGBM (Weighted)** to the highest overall **PR-AUC (`0.6008`)** and **F1-Score (`0.5717`)** in the study.
+
+Third, recognizing that the default `0.50` probability cutoff is suboptimal for asymmetric medical risk, we performed continuous probability threshold sweeps (`t = 0.20` to `0.80`, step `0.01`) to calibrate two distinct clinical operating modes for each tuned model:
+1. **Max-F1 Operating Point:** Maximizes balanced Precision and Recall (where Tuned LightGBM at `t = 0.57` caught `327/556` crashes with only `261` false alarms—achieving our project's highest F1-Score and cutting 110 false alarms compared to untuned baseline).
+2. **Clinical Safety Operating Point ($\ge 65\%$ Recall):** Prioritizes patient safety by minimizing missed hypotensive collapses, intentionally accepting a ~1:1 false-to-true alarm ratio (`46.6%–49.5%` Precision) to rescue high-risk patients.
+
+Fourth, we constructed a 4-cell visual diagnostic notebook (`notebooks/hyperparameter_tuning.ipynb`) featuring a 16-stage progression leaderboard, grouped stage bar charts, continuous Precision-Recall-F1 threshold sweep curves, and holdout confusion matrices (evaluated on 2,728 unseen test sessions: 2,172 Stable, 556 IDH Crash) incorporating a 3-way LightGBM progression breakdown (Untuned Baseline @ 0.50 vs. Max-F1 @ 0.57 vs. Clinical Safety @ 0.51). The confusion matrices demonstrated that Week 4 optimization increased captured holdout crashes in Random Forest (Weighted) from `265` to `387` (**+122 additional crashes rescued**, `69.60%` Recall at `t = 0.44`), Random Forest (SMOTE) from `276` to `366` (**+90 rescued**, `65.83%` Recall at `t = 0.44`), and XGBoost/LightGBM to `363` (**+61 rescued**, `65.29%` Recall at `t = 0.51`).
+
+Finally, based on its #1 ranking in both PR-AUC (`0.6008`) and F1-Score (`0.5717`) alongside its dual-threshold flexibility, we selected **Tuned Class-Weighted LightGBM** as our primary Champion Model (with Tuned Random Forest retained as our secondary benchmark), serializing all tuned estimators, probability arrays, and threshold metadata into `models/tuned_models_bundle.pkl` and documenting all findings in `docs/tuning_report.md`.
