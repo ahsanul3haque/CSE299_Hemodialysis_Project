@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from feature_engineering import engineer_clinical_features
 
 pd.set_option('display.max_columns', None)
 
@@ -166,16 +167,16 @@ def scale_features(df):
 
 if __name__ == "__main__":
     target_file = "dataset_10.csv"
-
+    
     loaded_only_dataset = load_and_align_data(target_file)
     translated_dataset = translate_columns(loaded_only_dataset)
     binarized_dataset = hypotension_binarization(translated_dataset)
     optimized_dataset = optimize_memory(binarized_dataset)
     leakproof_dataset = remove_leakable_features(optimized_dataset)
     imputed_dataset = handle_missing_values(leakproof_dataset)
-    capped_dataset = cap_outliers(imputed_dataset)
+    engineered_dataset = engineer_clinical_features(imputed_dataset)
+    capped_dataset = cap_outliers(engineered_dataset)
     scaled_features_dataset = scale_features(capped_dataset)
 
-    scaled_features_dataset.to_csv(
-        "data/processed_dataset_10.csv", index=False)
+    scaled_features_dataset.to_csv("data/processed_dataset_10.csv", index=False)
     print("Pipeline complete! Exported processed_dataset_10.csv to the data/ folder.")
