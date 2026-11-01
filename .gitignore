@@ -1,7 +1,11 @@
+<<<<<<< HEAD
 data/ 
 __pycache__/
 *.pyc
 
 data/
+=======
+data/ 
+>>>>>>> main
 __pycache__/
 *.pyc
