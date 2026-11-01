@@ -12,7 +12,7 @@ from sklearn.metrics import (
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
-from imblearn.over_sampling import SMOTE
+from imblearn.over_sampling import SMOTE, ADASYN
 from imblearn.pipeline import Pipeline as ImbPipeline
 
 warnings.filterwarnings("ignore")
@@ -74,6 +74,23 @@ def get_search_configs(pos_weight):
                 "rf__max_features": ["sqrt", "log2", 0.5]
             }
         },
+        "Random Forest (ADASYN)": {
+            "baseline": ImbPipeline([
+                ("adasyn", ADASYN(random_state=42)),
+                ("rf", RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1))
+            ]),
+            "estimator": ImbPipeline([
+                ("adasyn", ADASYN(random_state=42)),
+                ("rf", RandomForestClassifier(random_state=42, n_jobs=-1))
+            ]),
+            "param_distributions": {
+                "rf__n_estimators": [150, 250, 350],
+                "rf__max_depth": [10, 15, 20, None],
+                "rf__min_samples_split": [2, 5, 10],
+                "rf__min_samples_leaf": [1, 2, 4],
+                "rf__max_features": ["sqrt", "log2", 0.5]
+            }
+        },
         "XGBoost (Weighted)": {
             "baseline": XGBClassifier(
                 n_estimators=100, scale_pos_weight=pos_weight,
@@ -93,6 +110,25 @@ def get_search_configs(pos_weight):
                 "gamma": [0, 0.1, 0.3]
             }
         },
+        "XGBoost (ADASYN)": {
+            "baseline": ImbPipeline([
+                ("adasyn", ADASYN(random_state=42)),
+                ("xgb", XGBClassifier(n_estimators=100, eval_metric="logloss", random_state=42, n_jobs=-1))
+            ]),
+            "estimator": ImbPipeline([
+                ("adasyn", ADASYN(random_state=42)),
+                ("xgb", XGBClassifier(eval_metric="logloss", random_state=42, n_jobs=-1))
+            ]),
+            "param_distributions": {
+                "xgb__n_estimators": [100, 200, 300],
+                "xgb__max_depth": [3, 4, 5, 6, 8],
+                "xgb__learning_rate": [0.01, 0.03, 0.05, 0.1],
+                "xgb__min_child_weight": [1, 3, 5, 7],
+                "xgb__subsample": [0.7, 0.8, 0.9, 1.0],
+                "xgb__colsample_bytree": [0.6, 0.8, 1.0],
+                "xgb__gamma": [0, 0.1, 0.3]
+            }
+        },
         "LightGBM (Weighted)": {
             "baseline": LGBMClassifier(
                 n_estimators=100, scale_pos_weight=pos_weight,
@@ -110,6 +146,25 @@ def get_search_configs(pos_weight):
                 "min_child_samples": [10, 20, 40, 60],
                 "subsample": [0.7, 0.8, 0.9, 1.0],
                 "colsample_bytree": [0.6, 0.8, 1.0]
+            }
+        },
+        "LightGBM (ADASYN)": {
+            "baseline": ImbPipeline([
+                ("adasyn", ADASYN(random_state=42)),
+                ("lgbm", LGBMClassifier(n_estimators=100, random_state=42, n_jobs=-1, verbose=-1))
+            ]),
+            "estimator": ImbPipeline([
+                ("adasyn", ADASYN(random_state=42)),
+                ("lgbm", LGBMClassifier(random_state=42, n_jobs=-1, verbose=-1))
+            ]),
+            "param_distributions": {
+                "lgbm__n_estimators": [100, 200, 300],
+                "lgbm__max_depth": [4, 6, 8, -1],
+                "lgbm__num_leaves": [15, 31, 63, 127],
+                "lgbm__learning_rate": [0.01, 0.03, 0.05, 0.1],
+                "lgbm__min_child_samples": [10, 20, 40, 60],
+                "lgbm__subsample": [0.7, 0.8, 0.9, 1.0],
+                "lgbm__colsample_bytree": [0.6, 0.8, 1.0]
             }
         }
     }

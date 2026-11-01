@@ -28,6 +28,9 @@ To justify our candidate pool before the faculty committee, Week 4 evaluates thr
 - **Mathematical Mechanism:** Bucketizes continuous clinical variables (such as `Systolic_BP`, `Pulse_Pressure`, and `Relative_Weight_Gain`) into discrete histograms (255 bins), accelerating split-finding complexity from $O(\text{data} \times \text{features})$ to $O(\text{bins} \times \text{features})$.
 - **Tree Growth Strategy:** Grows trees **leaf-wise (best-first)**—choosing the single leaf across the entire tree that yields the largest reduction in loss ($\Delta \mathcal{L}$). Controlled by `num_leaves` and `min_child_samples`, leaf-wise growth captures complex, asymmetric hemodynamic interactions (e.g., high ultrafiltration strain combined with low mean arterial pressure) with fewer trees than depth-wise boosting.
 
+### 2.4 Data-Level vs. Cost-Level Imbalance Strategies
+While `scale_pos_weight` mathematically penalizes missed crashes at the algorithm's cost-function level, we simultaneously benchmarked physical data-level oversampling via `imblearn.pipeline`. We compared **SMOTE** (which draws uniform linear interpolations between minority cases) against **ADASYN** (which uses a density distribution to dynamically generate synthetic patients exclusively in the hardest-to-learn boundary regions).
+
 ---
 
 ## 3. Hyperparameter Search Methodology & Structural Discoveries
@@ -52,6 +55,17 @@ Within the 10,909-row training partition, we executed 5-Fold Stratified `Randomi
 
 ---
 
+### 3.4 Geometric Analysis of Synthetic Oversampling (PCA Projection)
+To visually diagnose why physical oversampling underperformed native class weighting, we conducted a geometric analysis by projecting the baseline training set, SMOTE dataset, and ADASYN dataset into a 2D Principal Component Analysis (PCA) space.
+
+*(Insert `visualizations/oversampling_geometry_pca.png` here)*
+
+* **Original Imbalance:** The first panel shows a massive cloud of safe sessions with a sparse, overlapping distribution of clinical crashes[cite: 1].
+* **SMOTE's Interpolation:** The middle panel displays how SMOTE generated a broad, somewhat uniform layer of synthetic crashes to balance the classes[cite: 1].
+* **ADASYN's Over-Concentration:** The third panel reveals ADASYN's aggressive behavior, creating a massive, dense cluster of synthetic crashes directly in the highly overlapping center region[cite: 1].
+
+This visual evidence directly explains our empirical leaderboard results. By flooding the overlapping decision boundary with synthetic data, ADASYN forced the models to over-fit to clinical noise. By contrast, the native class weighting of LightGBM handled the original, un-altered boundary gracefully without artificially distorting the feature space.
+
 ## 4. Clinical Decision Threshold Calibration & The Precision-Recall Trade-Off
 
 ### 4.1 Breaking the Arbitrary `0.50` Cutoff Rule
@@ -67,27 +81,38 @@ To optimize this trade-off, we swept decision thresholds $t \in [0.20, 0.80]$ (`
 
 ---
 
-## 5. Complete 16-Stage Holdout Evaluation Matrix (2,728 Unseen Sessions)
+## 5. Complete 28-Stage Holdout Evaluation Matrix (2,728 Unseen Sessions)
 
-| Model Architecture | Optimization Stage | Threshold ($t$) | Accuracy | Precision (PPV) | Recall (Sensitivity) | F1-Score | ROC-AUC | PR-AUC |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Random Forest (Weighted)** | 1. Baseline (Default @ 0.50) | 0.50 | 0.8262 | 0.5891 | 0.4874 | 0.5335 | 0.8111 | 0.5760 |
-| **Random Forest (Weighted)** | 2. Tuned (Default @ 0.50) | 0.50 | 0.8112 | 0.5324 | 0.6061 | 0.5669 | **0.8158** | 0.5928 |
-| **Random Forest (Weighted)** | 3. Tuned + Max-F1 Thresh | 0.50 | 0.8112 | 0.5324 | 0.6061 | 0.5669 | **0.8158** | 0.5928 |
-| **Random Forest (Weighted)** | **4. Tuned + Clinical Safety Thresh** | **0.44** | 0.7757 | 0.4663 | **0.6960** | 0.5584 | **0.8158** | 0.5928 |
-| **Random Forest (SMOTE)** | 1. Baseline (Default @ 0.50) | 0.50 | 0.8145 | 0.5488 | 0.5054 | 0.5262 | 0.8055 | 0.5485 |
-| **Random Forest (SMOTE)** | 2. Tuned (Default @ 0.50) | 0.50 | 0.8163 | 0.5485 | 0.5594 | 0.5539 | 0.8110 | 0.5740 |
-| **Random Forest (SMOTE)** | **3. Tuned + Max-F1 Thresh** | **0.48** | 0.8123 | 0.5348 | 0.6079 | **0.5690** | 0.8110 | 0.5740 |
-| **Random Forest (SMOTE)** | 4. Tuned + Clinical Safety Thresh | 0.44 | 0.7870 | 0.4835 | 0.6583 | 0.5575 | 0.8110 | 0.5740 |
-| **XGBoost (Weighted)** | 1. Baseline (Default @ 0.50) | 0.50 | 0.7999 | 0.5084 | 0.5432 | 0.5252 | 0.7927 | 0.5369 |
-| **XGBoost (Weighted)** | 2. Tuned (Default @ 0.50) | 0.50 | 0.7874 | 0.4843 | 0.6637 | 0.5599 | 0.8121 | 0.5981 |
-| **XGBoost (Weighted)** | **3. Tuned + Max-F1 Thresh** | **0.55** | 0.8105 | 0.5308 | 0.6043 | 0.5652 | 0.8121 | 0.5981 |
-| **XGBoost (Weighted)** | 4. Tuned + Clinical Safety Thresh | 0.51 | 0.7929 | 0.4939 | 0.6529 | 0.5624 | 0.8121 | 0.5981 |
-| **LightGBM (Weighted)** | 1. Baseline (Default @ 0.50) | 0.50 | 0.7878 | 0.4850 | 0.6709 | 0.5630 | 0.8132 | 0.5966 |
-| **LightGBM (Weighted)** | 2. Tuned (Default @ 0.50) | 0.50 | 0.7878 | 0.4848 | 0.6601 | 0.5590 | 0.8143 | **0.6008** |
-| **LightGBM (Weighted)** | **3. Tuned + Max-F1 Thresh** | **0.57** | **0.8204** | **0.5561** | 0.5881 | **0.5717** | 0.8143 | **0.6008** |
-| **LightGBM (Weighted)** | **4. Tuned + Clinical Safety Thresh** | **0.51** | 0.7933 | 0.4946 | 0.6529 | 0.5628 | 0.8143 | **0.6008** |
-
+| Model                    | Stage                                    |   Threshold |   Accuracy |   Precision |   Recall |   F1_Score |   ROC_AUC |   PR_AUC |
+|:-------------------------|:-----------------------------------------|------------:|-----------:|------------:|---------:|-----------:|----------:|---------:|
+| Random Forest (Weighted) | 1. Baseline (Default @ 0.50)             |        0.5  |     0.8273 |      0.588  |   0.5108 |     0.5467 |    0.8123 |   0.5801 |
+| Random Forest (Weighted) | 2. Tuned (Default @ 0.50)                |        0.5  |     0.8134 |      0.5375 |   0.6061 |     0.5697 |    0.8205 |   0.5991 |
+| Random Forest (Weighted) | 3. Tuned + Max-F1 Thresh (0.49)          |        0.49 |     0.8079 |      0.524  |   0.6277 |     0.5712 |    0.8205 |   0.5991 |
+| Random Forest (Weighted) | 4. Tuned + Clinical Safety Thresh (0.47) |        0.47 |     0.7984 |      0.5042 |   0.6529 |     0.569  |    0.8205 |   0.5991 |
+| Random Forest (SMOTE)    | 1. Baseline (Default @ 0.50)             |        0.5  |     0.8233 |      0.5758 |   0.5054 |     0.5383 |    0.8102 |   0.5667 |
+| Random Forest (SMOTE)    | 2. Tuned (Default @ 0.50)                |        0.5  |     0.8185 |      0.553  |   0.5719 |     0.5623 |    0.8124 |   0.5761 |
+| Random Forest (SMOTE)    | 3. Tuned + Max-F1 Thresh (0.48)          |        0.48 |     0.8138 |      0.539  |   0.5971 |     0.5666 |    0.8124 |   0.5761 |
+| Random Forest (SMOTE)    | 4. Tuned + Clinical Safety Thresh (0.42) |        0.42 |     0.7771 |      0.468  |   0.6835 |     0.5556 |    0.8124 |   0.5761 |
+| Random Forest (ADASYN)   | 1. Baseline (Default @ 0.50)             |        0.5  |     0.8167 |      0.5547 |   0.5108 |     0.5318 |    0.7996 |   0.5496 |
+| Random Forest (ADASYN)   | 2. Tuned (Default @ 0.50)                |        0.5  |     0.805  |      0.5208 |   0.5414 |     0.5309 |    0.8077 |   0.5568 |
+| Random Forest (ADASYN)   | 3. Tuned + Max-F1 Thresh (0.44)          |        0.44 |     0.7804 |      0.4723 |   0.6583 |     0.55   |    0.8077 |   0.5568 |
+| Random Forest (ADASYN)   | 4. Tuned + Clinical Safety Thresh (0.44) |        0.44 |     0.7804 |      0.4723 |   0.6583 |     0.55   |    0.8077 |   0.5568 |
+| XGBoost (Weighted)       | 1. Baseline (Default @ 0.50)             |        0.5  |     0.7936 |      0.4943 |   0.5414 |     0.5167 |    0.7894 |   0.5432 |
+| XGBoost (Weighted)       | 2. Tuned (Default @ 0.50)                |        0.5  |     0.7874 |      0.4838 |   0.6439 |     0.5525 |    0.8156 |   0.599  |
+| XGBoost (Weighted)       | 3. Tuned + Max-F1 Thresh (0.54)          |        0.54 |     0.8105 |      0.5307 |   0.6061 |     0.5659 |    0.8156 |   0.599  |
+| XGBoost (Weighted)       | 4. Tuned + Clinical Safety Thresh (0.46) |        0.46 |     0.7698 |      0.4579 |   0.705  |     0.5552 |    0.8156 |   0.599  |
+| XGBoost (ADASYN)         | 1. Baseline (Default @ 0.50)             |        0.5  |     0.8178 |      0.584  |   0.3687 |     0.452  |    0.7795 |   0.5255 |
+| XGBoost (ADASYN)         | 2. Tuned (Default @ 0.50)                |        0.5  |     0.7522 |      0.4277 |   0.6385 |     0.5123 |    0.7892 |   0.5216 |
+| XGBoost (ADASYN)         | 3. Tuned + Max-F1 Thresh (0.48)          |        0.48 |     0.7262 |      0.403  |   0.714  |     0.5152 |    0.7892 |   0.5216 |
+| XGBoost (ADASYN)         | 4. Tuned + Clinical Safety Thresh (0.48) |        0.48 |     0.7262 |      0.403  |   0.714  |     0.5152 |    0.7892 |   0.5216 |
+| LightGBM (Weighted)      | 1. Baseline (Default @ 0.50)             |        0.5  |     0.7764 |      0.4661 |   0.6673 |     0.5488 |    0.8124 |   0.5912 |
+| LightGBM (Weighted)      | 2. Tuned (Default @ 0.50)                |        0.5  |     0.7823 |      0.4751 |   0.6529 |     0.55   |    0.8169 |   0.5871 |
+| LightGBM (Weighted)      | 3. Tuned + Max-F1 Thresh (0.53)          |        0.53 |     0.7984 |      0.5043 |   0.6313 |     0.5607 |    0.8169 |   0.5871 |
+| LightGBM (Weighted)      | 4. Tuned + Clinical Safety Thresh (0.47) |        0.47 |     0.7702 |      0.4577 |   0.6906 |     0.5505 |    0.8169 |   0.5871 |
+| LightGBM (ADASYN)        | 1. Baseline (Default @ 0.50)             |        0.5  |     0.8354 |      0.6551 |   0.4065 |     0.5017 |    0.8049 |   0.5721 |
+| LightGBM (ADASYN)        | 2. Tuned (Default @ 0.50)                |        0.5  |     0.7911 |      0.4875 |   0.491  |     0.4892 |    0.7794 |   0.5136 |
+| LightGBM (ADASYN)        | 3. Tuned + Max-F1 Thresh (0.44)          |        0.44 |     0.7496 |      0.4245 |   0.6421 |     0.5111 |    0.7794 |   0.5136 |
+| LightGBM (ADASYN)        | 4. Tuned + Clinical Safety Thresh (0.43) |        0.43 |     0.7397 |      0.4137 |   0.6637 |     0.5097 |    0.7794 |   0.5136 |
 ---
 
 ## 6. Notebook Visual Diagnostics & "Before vs. After" Patient Analysis (`notebooks/hyperparameter_tuning.ipynb`)
