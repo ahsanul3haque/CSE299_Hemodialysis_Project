@@ -44,20 +44,24 @@ def create_versioned_datasets():
     X_train_adasyn, y_train_adasyn = adasyn.fit_resample(X_train, y_train)
 
     #Recombine features (X) and targets (y) into clean DataFrames
+    train_baseline_df = pd.concat([X_train, y_train], axis=1)
     train_smote_df = pd.concat([X_train_smote, y_train_smote], axis=1)
     train_adasyn_df = pd.concat([X_train_adasyn, y_train_adasyn], axis=1)
     test_holdout_df = pd.concat([X_test, y_test], axis=1)
 
     #Export version-controlled CSV artifacts
+    baseline_path = os.path.join(output_dir, f"train_baseline_{version_tag}.csv")
     smote_path = os.path.join(output_dir, f"train_smote_{version_tag}.csv")
     adasyn_path = os.path.join(output_dir, f"train_adasyn_{version_tag}.csv")
     test_path = os.path.join(output_dir, f"test_holdout_{version_tag}.csv")
 
+    train_baseline_df.to_csv(baseline_path, index=False)
     train_smote_df.to_csv(smote_path, index=False)
     train_adasyn_df.to_csv(adasyn_path, index=False)
     test_holdout_df.to_csv(test_path, index=False)
 
     print("✅ MLOps Data Versioning Complete!")
+    print(f"Exported: {baseline_path} (Rows: {len(train_baseline_df)})")
     print(f"Exported: {smote_path} (Rows: {len(train_smote_df)})")
     print(f"Exported: {adasyn_path} (Rows: {len(train_adasyn_df)})")
     print(f"Exported (Untouched Vault): {test_path} (Rows: {len(test_holdout_df)})")
