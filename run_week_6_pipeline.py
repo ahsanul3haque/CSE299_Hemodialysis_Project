@@ -46,6 +46,26 @@ trainer.fit(X_train_proc, y_train)
 
 #Export bundle in the exact format explainability.py expects
 bundle = trainer.get_champion_bundle(X_test_proc, y_test)
-os.makedirs("models", exist_ok=True)
-joblib.dump(bundle, "models/tuned_models_bundle.pkl")
-print("Saved new Week 6 bundle to models/tuned_models_bundle.pkl")
+
+#Extract the Champion LightGBM entry from the bundle
+champion_key = "LightGBM (Weighted)"
+champion_info = bundle["models"][champion_key]
+
+#Chain fitted preprocessing + fitted Champion LightGBM into one end-to-end Pipeline
+final_pipeline = Pipeline([
+    ("preprocessing", preprocess_pipeline),
+    ("classifier", champion_info["best_estimator"]),
+])
+
+#Package the pipeline with inference metadata
+production_artifact = {
+    "pipeline": final_pipeline,
+    "clinical_threshold": champion_info["clinical_threshold"],
+    "max_f1_threshold": champion_info["opt_f1_threshold"],
+    "expected_features": list(X_train.columns),
+    "model_name": champion_key,
+}
+
+ARTIFACT_PATH = "models/champion_inference_pipeline.joblib"
+joblib.dump(production_artifact, ARTIFACT_PATH)
+print(f"Serialized final production pipeline to {ARTIFACT_PATH}")
