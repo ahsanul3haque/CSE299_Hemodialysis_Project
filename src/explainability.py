@@ -153,14 +153,19 @@ def select_clinical_archetypes(X_test, y_test, y_prob_test, opt_f1_thresh, clini
     tp_high_sorted = tp_high_indices[np.argsort(prob_arr[tp_high_indices])]
     idx_tp_caught = int(tp_high_sorted[int(len(tp_high_sorted) * 0.75)])
 
-    # 2. Rescued TP: Crashes caught ONLY because Clinical Safety Threshold (0.51) < Max-F1 (0.57)
+   # 2. Rescued TP: Crashes caught ONLY because Clinical Safety Threshold < Max-F1
     tp_rescued_indices = np.where(
-        (y_true_arr == 1) & (prob_arr >= clinical_thresh) & (
-            prob_arr < opt_f1_thresh)
+        (y_true_arr == 1) & (prob_arr >= clinical_thresh) & (prob_arr < opt_f1_thresh)
     )[0]
-    tp_rescued_sorted = tp_rescued_indices[np.argsort(
-        prob_arr[tp_rescued_indices])]
-    idx_tp_rescued = int(tp_rescued_sorted[len(tp_rescued_sorted) // 2])
+    tp_rescued_sorted = tp_rescued_indices[np.argsort(prob_arr[tp_rescued_indices])]
+
+    if len(tp_rescued_sorted) > 0:
+        idx_tp_rescued = int(tp_rescued_sorted[len(tp_rescued_sorted) // 2])
+    else:
+        # Fallback: pick the most borderline caught True Positive (lowest prob >= clinical_thresh)
+        tp_all_caught = np.where((y_true_arr == 1) & (prob_arr >= clinical_thresh))[0]
+        tp_all_sorted = tp_all_caught[np.argsort(prob_arr[tp_all_caught])]
+        idx_tp_rescued = int(tp_all_sorted[0])
 
     # 3. False Positive (FP): Stable session flagged by Clinical Safety Threshold (>= 0.51)
     fp_indices = np.where((y_true_arr == 0) & (prob_arr >= clinical_thresh))[0]
@@ -184,7 +189,7 @@ def select_clinical_archetypes(X_test, y_test, y_prob_test, opt_f1_thresh, clini
         "tp_rescued": {
             "pos_idx": idx_tp_rescued,
             "df_index": int(X_test.index[idx_tp_rescued]),
-            "label": "2. Clinical Safety Rescued Crash (0.51 <= P < 0.57)",
+            "label": f"2. Clinical Safety Rescued Crash ({clinical_thresh:.2f} <= P < {opt_f1_thresh:.2f})",
             "actual": int(y_true_arr[idx_tp_rescued]),
             "pred_prob": float(prob_arr[idx_tp_rescued]),
             "filename": "visualizations/shap_waterfall_2_tp_rescued.png",
