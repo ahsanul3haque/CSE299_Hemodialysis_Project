@@ -77,3 +77,25 @@ Third, recognizing that the default `0.50` probability cutoff is suboptimal for 
 Fourth, we constructed a 4-cell visual diagnostic notebook (`notebooks/hyperparameter_tuning.ipynb`) featuring a 16-stage progression leaderboard, grouped stage bar charts, continuous Precision-Recall-F1 threshold sweep curves, and holdout confusion matrices (evaluated on 2,728 unseen test sessions: 2,172 Stable, 556 IDH Crash) incorporating a 3-way LightGBM progression breakdown (Untuned Baseline @ 0.50 vs. Max-F1 @ 0.57 vs. Clinical Safety @ 0.51). The confusion matrices demonstrated that Week 4 optimization increased captured holdout crashes in Random Forest (Weighted) from `265` to `387` (**+122 additional crashes rescued**, `69.60%` Recall at `t = 0.44`), Random Forest (SMOTE) from `276` to `366` (**+90 rescued**, `65.83%` Recall at `t = 0.44`), and XGBoost/LightGBM to `363` (**+61 rescued**, `65.29%` Recall at `t = 0.51`).
 
 Finally, based on its #1 ranking in both PR-AUC (`0.6008`) and F1-Score (`0.5717`) alongside its dual-threshold flexibility, we selected **Tuned Class-Weighted LightGBM** as our primary Champion Model (with Tuned Random Forest retained as our secondary benchmark), serializing all tuned estimators, probability arrays, and threshold metadata into `models/tuned_models_bundle.pkl` and documenting all findings in `docs/tuning_report.md`.
+
+---
+
+## Week 5
+**Date:** November 16, 2026
+
+**Status:** Complete
+
+**Update Summary:**
+In Week 5, we transitioned from predictive model optimization to Explainable AI (XAI) by opening up our Champion **Tuned Class-Weighted LightGBM** model (`PR-AUC = 0.6008`, `F1 = 0.5717`) using **SHAP (SHapley Additive exPlanations)** across all `2,728` unseen holdout hemodialysis sessions (`23` clinical features)[cite: 5].
+
+First, we engineered `src/explainability.py` to initialize `shap.TreeExplainer` on the serialized Champion LightGBM estimator from `models/tuned_models_bundle.pkl`. We computed exact Shapley values in log-odds margin space ($E[f(X)] = -0.6145$) with `check_additivity=True`, mathematically verifying that base log-odds plus feature attributions reconstruct exact model probabilities across every holdout session.
+
+Second, we generated global feature attribution rankings (`data/shap_feature_importance.csv`, `visualizations/shap_global_bar.png`, and `visualizations/shap_global_beeswarm.png`)[cite: 4, 5]. Ranking predictors by $\text{mean}(|\phi_j|)$ confirmed strong clinical alignment: `Systolic_BP` ranked #1 (`0.3464` mean |SHAP|, `18.69%` contribution)[cite: 4], followed immediately by our Phase 1 engineered hemodynamic features **`Relative_Weight_Gain` (`0.1914`, `10.33%`)**[cite: 4] and **`Pulse_Pressure` (`0.1825`, `9.85%`)**[cite: 4], alongside `Age` (`7.38%`), `Dry_Weight` (`6.99%`), `Transmembrane_Pressure` (`6.41%`), and `Mean_Arterial_Pressure` (`3.96%`)[cite: 4]. Collectively, our domain-engineered features accounted for **24.14%** of total global attribution[cite: 4].
+
+Third, we conducted local patient-level diagnostics by generating individualized SHAP Waterfall plots (`visualizations/shap_waterfall_*.png`) for four clinical archetypes[cite: 6, 7, 8, 9]:
+1. **High-Confidence Caught Crash (`TP` — Session ID `6780`, Row `#1666`):** Predicted crash probability of `81.33%` ($f(x) = +1.471$), driven by `Pulse_Pressure` (`+0.48`), `Dry_Weight` (`+0.29`), and `Systolic_BP` (`+0.25`)[cite: 6].
+2. **Clinical Safety Rescued Crash (`TP` — Session ID `11163`, Row `#1692`):** Actual crash session with `53.63%` predicted probability ($f(x) = +0.145$) where `Pulse_Pressure` (`+0.50`) was partially offset by moderate `Relative_Weight_Gain` (`-0.31`)—demonstrating a real patient saved specifically because our calibrated Clinical Safety Threshold (`0.51`) sits below the Max-F1 cutoff (`0.57`)[cite: 7].
+3. **False Alarm Session (`FP` — Session ID `10999`, Row `#2035`):** Stable session flagged at `62.58%` due to elevated `Transmembrane_Pressure` (`+0.19`) and `Pulse_Pressure` (`+0.19`)[cite: 8].
+4. **Hemodynamically Stable Session (`TN` — Session ID `924`, Row `#830`):** Low `16.01%` risk score ($f(x) = -1.658$) anchored by protective `Pulse_Pressure` (`-0.29`), `Age` (`-0.26`), and `Systolic_BP` (`-0.26`)[cite: 9].
+
+Fourth, we generated a 2x2 SHAP Dependence & Interaction grid (`visualizations/shap_dependence_interactions.png`) uncovering sharp non-linear risk thresholds (`Systolic_BP ≈ 0.62`, `Relative_Weight_Gain ≈ 0.45–0.60`, `Pulse_Pressure ≈ 0.55`)[cite: 3] and defined the actionable vs. immutable feature constraints for Week 6. Finally, we serialized the full `shap.Explanation` object and archetype metadata into `models/shap_bundle.pkl`, built `notebooks/shap_explainability.ipynb`, and documented all findings in `docs/shap_report.md`.
