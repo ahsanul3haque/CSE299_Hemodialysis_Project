@@ -99,3 +99,19 @@ Third, we conducted local patient-level diagnostics by generating individualized
 4. **Hemodynamically Stable Session (`TN` — Session ID `924`, Row `#830`):** Low `16.01%` risk score ($f(x) = -1.658$) anchored by protective `Pulse_Pressure` (`-0.29`), `Age` (`-0.26`), and `Systolic_BP` (`-0.26`)[cite: 9].
 
 Fourth, we generated a 2x2 SHAP Dependence & Interaction grid (`visualizations/shap_dependence_interactions.png`) uncovering sharp non-linear risk thresholds (`Systolic_BP ≈ 0.62`, `Relative_Weight_Gain ≈ 0.45–0.60`, `Pulse_Pressure ≈ 0.55`)[cite: 3] and defined the actionable vs. immutable feature constraints for Week 6. Finally, we serialized the full `shap.Explanation` object and archetype metadata into `models/shap_bundle.pkl`, built `notebooks/shap_explainability.ipynb`, and documented all findings in `docs/shap_report.md`.
+
+---
+
+## Week 6
+**Date:** November 23, 2026
+
+**Status:** Complete
+
+**Update Summary:**
+In Week 6, we extended our Explainable AI pipeline into **Prescriptive AI** by engineering a **Constrained Counterfactual "What-If" Intervention Engine** (`src/counterfactuals.py` and `notebooks/counterfactual_analysis.ipynb`) built on our Champion **Tuned Class-Weighted LightGBM** model (`PR-AUC = 0.6008`, `Clinical Safety Threshold = 0.51`).
+
+To ensure medical realism, we partitioned all 23 clinical variables into **17 immutable patient baselines** (such as `Age`, `Dry_Weight`, `Pre_Weight`, and baseline blood pressures) and **6 actionable bedside dialysis levers** (`Dialysate_Temperature`, `Transmembrane_Pressure`, `Dialysate_Bath`, `Dialysate_Flow`, `Blood_Flow`, and `Dialysate_Conductivity`), bounding candidate adjustments strictly within empirical 5th–95th percentile hospital operating limits. Using a hierarchical sparsity search (testing 1-lever changes before escalating to 2- and 3-lever combinations), we evaluated every high-risk holdout session (`734` sessions with `Predicted Prob >= 0.51`).
+
+Across the `734` flagged sessions, the optimizer successfully rescued **381 sessions (`51.91%`)** safely below the `0.51` threshold using an average of just **`1.41` machine dial adjustments per patient**, reducing mean cohort crash risk from **`67.67%` to `55.95%`** (`-11.72%` average drop). Ranking bedside levers showed `Dialysate_Temperature` (`57.22%` usage, `-13.66%` avg risk drop), `Transmembrane_Pressure` (`45.78%` usage, `-11.42%` avg risk drop), and `Dialysate_Bath` (`28.61%` usage, `-14.60%` avg risk drop) as the most effective modifiable interventions. Finally, auditing our patient archetypes demonstrated single-dial rescue for moderate-risk crashes (Session `11163`: `53.63% -> 43.10%`) while identifying severe frailty cases (Session `6780`: `81.33% -> 66.58%`) requiring direct medical escalation beyond machine tuning. All prescriptive tables and model artifacts were exported to `data/counterfactual_prescriptions.csv`, `data/counterfactual_lever_summary.csv`, `models/counterfactual_bundle.pkl`, and `docs/counterfactual_report.md`.
+
+In addition, we built and launched **Interactive Clinical Decision Support Prototype v1** (`app.py` and `requirements.txt`) using Streamlit, enabling clinicians to toggle between the `0.51` Clinical Safety and `0.57` Max-F1 cutoffs, inspect locked patient baselines, auto-apply AI counterfactual prescriptions with one click, and manually simulate real-time crash risk changes across all 6 actionable dialysis machine dials.
