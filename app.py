@@ -12,6 +12,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
+import numpy as np
+import plotly.graph_objects as go
+import shap
+from datetime import datetime
 from pydantic import ValidationError
 
 from src.models.inference import InferenceEngine
@@ -118,6 +122,154 @@ cf_df = cf_bundle["cf_df"]
 cf_rows_dict = cf_bundle["cf_rows_dict"]
 feature_names = list(X_test.columns)
 
+@st.cache_resource
+def load_shap_explainer(_engine):
+    """Extract the trained LightGBM estimator from the pipeline and cache TreeExplainer."""
+    model = _engine.pipeline[-1]
+    return shap.TreeExplainer(model)
+
+def explain_patient_live(engine, explainer, raw_patient_dict: dict, top_n: int = 8) -> pd.DataFrame:
+    """Transform a single raw patient dict through the pipeline and compute TreeSHAP impacts."""
+    raw_df = pd.DataFrame([raw_patient_dict])[engine.expected_features]
+    
+    # Run all preprocessing steps (imputation, feature engineering, outlier capping, scaling)
+    preprocessor = engine.pipeline[:-1]
+    X_trans = preprocessor.transform(raw_df)
+    
+    # Preserve engineered feature names
+    if isinstance(X_trans, pd.DataFrame):
+        feature_names = list(X_trans.columns)
+        X_vals = X_trans
+    else:
+        feature_names = list(engine.pipeline[-1].feature_name_)
+        X_vals = pd.DataFrame(X_trans, columns=feature_names)
+
+    # Compute TreeSHAP values (handles both list-of-arrays and 2D-array SHAP outputs)
+    shap_vals = explainer.shap_values(X_vals)
+    if isinstance(shap_vals, list):
+        sv = np.array(shap_vals[1])[0]  # Class 1 (Hypotension)
+    else:
+        sv = np.array(shap_vals)[0]
+
+    impact_df = pd.DataFrame({
+        "Feature": feature_names,
+        "SHAP_Impact": sv,
+        "Abs_Impact": np.abs(sv)
+    }).sort_values("Abs_Impact", ascending=False).head(top_n)
+
+    # Clean labels for nurses (e.g., "Systolic_BP" -> "Systolic BP")
+    impact_df["Label"] = impact_df["Feature"].str.replace("_", " ")
+    return impact_df.sort_values("SHAP_Impact", ascending=True)
+
+def build_shap_figure(impact_df: pd.DataFrame) -> go.Figure:
+    """Create a dark-mode friendly clinical diverging bar chart."""
+    colors = ["#ef4444" if v > 0 else "#14b8a6" for v in impact_df["SHAP_Impact"]]
+    
+    fig = go.Figure(go.Bar(
+        x=impact_df["SHAP_Impact"],
+        y=impact_df["Label"],
+        orientation="h",
+        marker_color=colors,
+        text=[f"{v:+.2f}" for v in impact_df["SHAP_Impact"]],
+        textposition="outside",
+        hovertemplate="<b>%{y}</b><br>Log-Odds Impact: %{x:+.3f}<extra></extra>"
+    ))
+    
+    fig.update_layout(
+        title="Top Clinical Risk Drivers (Live TreeSHAP)",
+        xaxis_title="Impact on Crash Risk (Red = Increases Risk | Teal = Protective)",
+        yaxis_title="",
+        height=340,
+        margin=dict(l=10, r=40, t=40, b=35),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(zeroline=True, zerolinewidth=1.5, zerolinecolor="#64748b", gridcolor="rgba(148,163,184,0.15)"),
+        yaxis=dict(tickfont=dict(size=12))
+    )
+    return fig
+
+
+def build_bedside_handoff_report(
+    patient_data: dict,
+    crash_prob: float,
+    alert: bool,
+    risk_tier: str,
+    impact_df: pd.DataFrame,
+    prescription_text: str | None = None,
+) -> str:
+    """Generate a structured bedside clinical handoff note for a nephrologist."""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+    sex_label = "Male" if patient_data.get("Sex") == 1 else "Female"
+    top_drivers = impact_df[impact_df["SHAP_Impact"] > 0].sort_values("SHAP_Impact", ascending=False).head(3)
+    driver_lines = "\n".join(
+        f"  - {row['Label']}: {row['SHAP_Impact']:+.3f} (increases risk)"
+        for _, row in top_drivers.iterrows()
+    ) or "  - No major positive risk drivers identified."
+
+    lines = [
+        "============================================================",
+        "HEMODIALYSIS CDSS — BEDSIDE CLINICAL HANDOFF SUMMARY",
+        f"Generated: {ts}",
+        "============================================================",
+        "",
+        "1. IDH RISK ASSESSMENT",
+        f"  - Predicted Crash Probability : {crash_prob:.2%}",
+        f"  - Risk Tier                   : {risk_tier}",
+        f"  - Clinical Safety Alert       : {'TRIGGERED (HIGH PRIORITY)' if alert else 'None'}",
+        "",
+        "2. PATIENT INTAKE SNAPSHOT",
+        f"  - Demographics : Age {patient_data.get('Age')} | Sex: {sex_label}",
+        f"  - Vitals       : Systolic BP {patient_data.get('Systolic_BP')} mmHg | Diastolic BP {patient_data.get('Diastolic_BP')} mmHg | Pulse {patient_data.get('Pulse')} bpm",
+        f"  - Fluid Status : Dry Weight {patient_data.get('Dry_Weight')} kg | Pre-Weight {patient_data.get('Pre_Weight')} kg | Gain {patient_data.get('Weight_Gain')} kg",
+        f"  - Dialysis Rx  : Temp {patient_data.get('Dialysate_Temperature')} °C | Blood Flow {patient_data.get('Blood_Flow')} mL/min | Dialysate Flow {patient_data.get('Dialysate_Flow')} mL/min",
+        "",
+        "3. TOP RISK DRIVERS (LIVE TREESHAP)",
+        driver_lines,
+        "",
+        "4. AI-SUGGESTED INTERVENTION / PRESCRIPTION",
+        prescription_text if prescription_text else "  - Not generated yet (run Live AI Prescription if High Risk).",
+        "",
+        "------------------------------------------------------------",
+        "Note: Decision support only. Confirm all orders with attending nephrologist.",
+    ]
+    return "\n".join(lines)
+
+
+def build_ward_triage_report(results_df: pd.DataFrame) -> str:
+    """Generate a prioritized shift triage summary from Tab 2 batch screening."""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+    total = len(results_df)
+    high_risk = results_df[results_df["Hypotension_Alert"] == True]
+
+    lines = [
+        "============================================================",
+        "HEMODIALYSIS CDSS — WARD SHIFT TRIAGE HANDOFF REPORT",
+        f"Generated: {ts}",
+        "============================================================",
+        f"Total Patients Screened : {total}",
+        f"High-Risk Alerts        : {len(high_risk)}",
+        f"Stable / Low Risk       : {total - len(high_risk)}",
+        "",
+        "PRIORITY ATTENTION LIST (SORTED BY CRASH PROBABILITY)",
+        "------------------------------------------------------------",
+    ]
+
+    if high_risk.empty:
+        lines.append("No high-risk hypotension alerts detected in this shift batch.")
+    else:
+        for idx, row in high_risk.iterrows():
+            lines.append(
+                f"  [Rank #{idx + 1}] Prob: {row['Crash_Probability']:.2%} | Tier: {row['Risk_Tier']} | "
+                f"Age: {row.get('Age', 'N/A')} | SBP: {row.get('Systolic_BP', 'N/A')} mmHg | "
+                f"Weight Gain: {row.get('Weight_Gain', 'N/A')} kg"
+            )
+
+    lines.append("------------------------------------------------------------")
+    lines.append("Full sorted patient table available in accompanying CSV export.")
+    return "\n".join(lines)
+
+
+
 
 # ==============================================================================
 # HELPER FUNCTIONS (TAB 3 SLIDER SYNC)
@@ -174,6 +326,17 @@ def render_three_tier_gauge(prob: float, clin_t: float, f1_t: float):
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.38), ncol=3, frameon=False, fontsize=8.5)
     plt.tight_layout()
     st.pyplot(fig, clear_figure=True)
+
+# Live TreeSHAP Explainability (shown for all patients)
+    explainer = load_shap_explainer(engine)
+    impact_df = explain_patient_live(engine, explainer, payload, top_n=8)
+    
+
+    top_risk = impact_df[impact_df["SHAP_Impact"] > 0].tail(2)["Label"].tolist()[::-1]
+    if top_risk:
+        st.caption(f"🩺 **Primary Risk Drivers:** {' and '.join(top_risk)} are pushing this patient's IDH risk upward.")
+
+        
 
 # ==============================================================================
 # LIVE RAW-UNIT COUNTERFACTUAL ENGINE (TAB 1 — POWERED BY engine.predict_batch)
@@ -326,22 +489,22 @@ with tab_live:
     # 1. Quick-Load Clinical Presets (Great for demos & rapid testing)
     PRESETS = {
         "stable": {
-            "t1_sex": "Male", "t1_age": 54.0, "t1_dry_w": 72.0, "t1_pre_w": 73.5,
-            "t1_sbp": 136.0, "t1_dbp": 82.0, "t1_pulse": 74.0, "t1_pt_temp": 36.6,
-            "t1_qb": 320.0, "t1_qd": 500.0, "t1_dtemp": 36.5, "t1_cond": 14.0,
-            "t1_ap": -130.0, "t1_vp": 135.0, "t1_tmp": 85.0, "t1_dialyzer": 1, "t1_bath": 1,
+            "t1_sex": "Male", "t1_age": 69.0, "t1_dry_w": 73.0, "t1_pre_w": 74.4,
+            "t1_sbp": 93.0, "t1_dbp": 40.0, "t1_pulse": 70.0, "t1_pt_temp": 35.9,
+            "t1_qb": 450.0, "t1_qd": 798.0, "t1_dtemp": 35.5, "t1_cond": 14.8,
+            "t1_ap": -185.0, "t1_vp": 170.0, "t1_tmp": 135.0, "t1_dialyzer": 5, "t1_bath": 1,
         },
         "moderate": {
-            "t1_sex": "Female", "t1_age": 67.0, "t1_dry_w": 62.0, "t1_pre_w": 64.8,
-            "t1_sbp": 112.0, "t1_dbp": 66.0, "t1_pulse": 84.0, "t1_pt_temp": 36.7,
-            "t1_qb": 300.0, "t1_qd": 500.0, "t1_dtemp": 36.8, "t1_cond": 13.9,
-            "t1_ap": -145.0, "t1_vp": 140.0, "t1_tmp": 120.0, "t1_dialyzer": 1, "t1_bath": 1,
+            "t1_sex": "Female", "t1_age": 86.0, "t1_dry_w": 49.0, "t1_pre_w": 49.6,
+            "t1_sbp": 104.0, "t1_dbp": 79.0, "t1_pulse": 79.0, "t1_pt_temp": 36.8,
+            "t1_qb": 410.0, "t1_qd": 640.0, "t1_dtemp": 35.5, "t1_cond": 14.0,
+            "t1_ap": -190.0, "t1_vp": 170.0, "t1_tmp": 50.0, "t1_dialyzer": 2, "t1_bath": 1,
         },
         "high_risk": {
-            "t1_sex": "Female", "t1_age": 74.0, "t1_dry_w": 58.0, "t1_pre_w": 61.8,
-            "t1_sbp": 94.0, "t1_dbp": 58.0, "t1_pulse": 94.0, "t1_pt_temp": 36.9,
-            "t1_qb": 300.0, "t1_qd": 500.0, "t1_dtemp": 37.0, "t1_cond": 13.8,
-            "t1_ap": -160.0, "t1_vp": 145.0, "t1_tmp": 165.0, "t1_dialyzer": 1, "t1_bath": 2,
+            "t1_sex": "Female", "t1_age": 86.0, "t1_dry_w": 47.5, "t1_pre_w": 48.9,
+            "t1_sbp": 197.0, "t1_dbp": 112.0, "t1_pulse": 77.0, "t1_pt_temp": 36.6,
+            "t1_qb": 450.0, "t1_qd": 790.0, "t1_dtemp": 35.5, "t1_cond": 14.0,
+            "t1_ap": -195.0, "t1_vp": 125.0, "t1_tmp": 180.0, "t1_dialyzer": 2, "t1_bath": 1,
         },
     }
 
@@ -468,6 +631,15 @@ with tab_live:
 
         render_three_tier_gauge(pred.crash_probability, clinical_thresh, max_f1_thresh)
 
+        # Live TreeSHAP Explainability (shown for all patients)
+        explainer = load_shap_explainer(engine)
+        impact_df = explain_patient_live(engine, explainer, payload, top_n=8)
+        st.plotly_chart(build_shap_figure(impact_df), use_container_width=True, key="t1_shap_chart")
+
+        top_risk = impact_df[impact_df["SHAP_Impact"] > 0].tail(2)["Label"].tolist()[::-1]
+        if top_risk:
+            st.caption(f"🩺 **Primary Risk Drivers:** {' and '.join(top_risk)} are pushing this patient's IDH risk upward.")
+
         # Live AI Prescription Button (Only shown when an alert is active)
         if pred.hypotension_alert:
             st.markdown("#### 🤖 Live Prescriptive AI (Raw Clinical Units)")
@@ -476,6 +648,9 @@ with tab_live:
                     rx = generate_live_prescription(engine, payload, pred.crash_probability)
 
                 if not rx["changes"]:
+                    st.session_state["last_prescription_summary"] = (
+                        "  - No machine-only adjustment reduced risk. Direct clinical escalation recommended."
+                    )
                     st.warning(
                         "No machine-only adjustment reduced risk for this profile. "
                         "Direct clinical escalation (UF hold, saline bolus, or physician review) is recommended."
@@ -487,6 +662,7 @@ with tab_live:
                         else "PARTIAL MITIGATION — CLINICAL ESCALATION ADVISED"
                     )
                     lines = []
+                    plain_lines = [f"  - Status: {badge} ({pred.crash_probability:.2%} -> {rx['new_prob']:.2%}, -{rx['risk_drop']:.2%})"]
                     for lev, new_v in rx["changes"].items():
                         cfg = RAW_LEVER_CONFIG[lev]
                         orig_v = float(payload[lev])
@@ -495,6 +671,9 @@ with tab_live:
                             f"• <strong>{action} {cfg['label']}:</strong> "
                             f"<code>{orig_v:.1f} {cfg['unit']}</code> &rarr; <code>{new_v:.1f} {cfg['unit']}</code>"
                         )
+                        plain_lines.append(f"  - {action} {cfg['label']}: {orig_v:.1f} {cfg['unit']} -> {new_v:.1f} {cfg['unit']}")
+
+                    st.session_state["last_prescription_summary"] = "\n".join(plain_lines)
                     st.markdown(
                         f"""
                         <div class="rx-box">
@@ -507,6 +686,22 @@ with tab_live:
                         unsafe_allow_html=True,
                     )
 
+        # One-Click Bedside Handoff Export
+        handoff_note = build_bedside_handoff_report(
+            patient_data=payload,
+            crash_prob=pred.crash_probability,
+            alert=pred.hypotension_alert,
+            risk_tier=pred.risk_tier,
+            impact_df=impact_df,
+            prescription_text=st.session_state.get("last_prescription_summary"),
+        )
+        st.download_button(
+            label="📄 Download Bedside Handoff Summary (.txt)",
+            data=handoff_note,
+            file_name=f"bedside_handoff_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
     except ValidationError as exc:
         st.error("⚠️ Clinical Input Validation Failed (Pydantic Guardrail):")
         for err in exc.errors():
@@ -574,6 +769,26 @@ with tab_batch:
                 b4.metric("Low Risk", int((results_df["Risk_Tier"] == "Low Risk").sum()))
 
                 st.dataframe(results_df, use_container_width=True, height=380)
+                
+
+                exp_col1, exp_col2 = st.columns(2)
+                with exp_col1:
+                    triage_report = build_ward_triage_report(results_df)
+                    st.download_button(
+                        label="📋 Download Shift Triage Report (.txt)",
+                        data=triage_report,
+                        file_name=f"ward_triage_report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                        mime="text/plain",
+                        use_container_width=True,
+                    )
+                with exp_col2:
+                    st.download_button(
+                        label="⬇️ Export Triage Results CSV",
+                        data=results_df.to_csv(index=False).encode("utf-8"),
+                        file_name="ward_triage_predictions.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
 
                 st.download_button(
                     label="⬇️ Export Triage Results CSV",
